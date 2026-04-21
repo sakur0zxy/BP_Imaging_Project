@@ -1,0 +1,10 @@
+.planning/graphs/
+config/local/local_env_config.m
+data/real_data/
+data/sim_data/
+artifacts/cache/
+cache/
+results/real_runs/
+results/sim_runs/
+*.asv
+*.autosave

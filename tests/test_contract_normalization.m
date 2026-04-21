@@ -1,0 +1,16 @@
+function tests = test_contract_normalization
+tests = functiontests(localfunctions);
+end
+
+function testNormalizeSourceData(testCase)
+raw.track = struct('X', [0, 1, 2], 'Y', [0, 0, 0], 'Z', [1, 1, 1]);
+raw.echo = complex(ones(4, 3));
+raw.radar = struct('numRangeSamples', 4, 'numRangeSamplesUp', 8, 'rangeStep', 0.5);
+
+source = normalize_source_data(raw, struct('kind', 'unit'));
+
+verifyEqual(testCase, source.track.x, [0, 1, 2]);
+verifyEqual(testCase, size(source.echo), [4, 3]);
+verifyEqual(testCase, numel(source.mask), 3);
+end
+
