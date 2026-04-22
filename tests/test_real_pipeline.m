@@ -34,6 +34,8 @@ verifyEqual(testCase, result.degradation.totalMissing, 0);
 verifyEqual(testCase, result.image.grid.numPixels, 32);
 verifyEqual(testCase, result.image.meta.usedAzimuthCount, 16);
 verifyGreaterThan(testCase, result.image.peak.value, 0);
+verifyEqual(testCase, result.recoveryEvaluation.status, 'disabled');
+verifyEqual(testCase, result.summary.recoveryEvaluationStatus, 'disabled');
 verifyTrue(testCase, isfield(result.summary, 'referenceCacheHit'));
 verifyEqual(testCase, result.summary.referenceCacheHit, false);
 verifySubstring(testCase, result.summary.referenceCacheFolder, 'real_data_baseline_');

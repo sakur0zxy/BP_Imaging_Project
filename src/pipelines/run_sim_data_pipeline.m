@@ -27,6 +27,7 @@ log.info('Generated simulation data: range=%d, azimuth=%d', ...
 save_checkpoint(runInfo, struct('stage', 'data_generated'));
 
 [sourceData, degradationInfo] = apply_degradation(sourceData, config.degradation);
+degradedSourceData = sourceData;
 log.info('Degradation mode: %s, missing ratio: %.6f', ...
     degradationInfo.mode, degradationInfo.missingRatio);
 save_checkpoint(runInfo, struct('stage', 'degradation_done'));
@@ -34,7 +35,7 @@ save_checkpoint(runInfo, struct('stage', 'degradation_done'));
 recoveryResult = struct('status', 'disabled', 'reason', 'recovery-disabled');
 recoveryFile = '';
 if config.recovery.enable
-    recoveryResult = run_cs_recovery(sourceData, config.recovery, sourceReference);
+    recoveryResult = run_recovery(sourceData, config.recovery, sourceReference);
     recoveryFile = save_analysis_result(recoveryResult, runInfo, config, 'recovery');
     if strcmp(recoveryResult.status, 'completed')
         sourceData = recoveryResult.sourceData;
@@ -68,6 +69,14 @@ if config.analysis.enableImageQuality
 end
 
 analysisResult = point_target_analysis(imageResult, config, analysisContext);
+recoveryEvaluation = run_recovery_evaluation(config, struct( ...
+    'runInfo', runInfo, ...
+    'sourceReference', sourceReference, ...
+    'degradedSourceData', degradedSourceData));
+if recoveryEvaluation.enabled
+    log.info('Recovery evaluation finished: status=%s, bestMethod=%s', ...
+        recoveryEvaluation.status, localStringOrEmpty(recoveryEvaluation.summary.bestMethodIfAny));
+end
 imageFiles = save_image_result(imageResult, runInfo, config, 'bp_image');
 analysisFile = save_analysis_result(analysisResult, runInfo, config, 'analysis');
 
@@ -81,13 +90,19 @@ result.degradation = degradationInfo;
 result.recovery = recoveryResult;
 result.image = imageResult;
 result.analysis = analysisResult;
-result.files = struct('image', imageFiles, 'analysis', analysisFile, 'recovery', recoveryFile);
+result.recoveryEvaluation = recoveryEvaluation;
+result.files = struct( ...
+    'image', imageFiles, ...
+    'analysis', analysisFile, ...
+    'recovery', recoveryFile, ...
+    'recoveryEvaluation', recoveryEvaluation.files);
 result.summary = struct( ...
     'pipelineElapsedSeconds', toc(pipelineTimer), ...
     'usedAzimuthCount', imageResult.meta.usedAzimuthCount, ...
     'totalAzimuthCount', imageResult.meta.totalAzimuthCount, ...
     'peakAmplitude', imageResult.peak.value, ...
     'recoveryStatus', recoveryResult.status, ...
+    'recoveryEvaluationStatus', recoveryEvaluation.status, ...
     'runDir', runInfo.runDir, ...
     'targetCount', size(config.scene.targetPositions, 1));
 
@@ -101,8 +116,21 @@ end
 if config.analysis.enableImageQuality
     result.summary.referenceCacheHit = analysisContext.referenceInfo.cacheHit;
 end
+if isfield(recoveryEvaluation, 'summary') && isstruct(recoveryEvaluation.summary) ...
+        && isfield(recoveryEvaluation.summary, 'bestMethodIfAny') ...
+        && ~isempty(recoveryEvaluation.summary.bestMethodIfAny)
+    result.summary.recoveryEvaluationBestMethod = recoveryEvaluation.summary.bestMethodIfAny;
+end
 
 save_summary(result, runInfo, config);
 save_checkpoint(runInfo, struct('stage', 'completed'));
 log.info('Simulation pipeline finished in %.3fs.', result.summary.pipelineElapsedSeconds);
+end
+
+function textValue = localStringOrEmpty(value)
+if isempty(value)
+    textValue = '';
+else
+    textValue = char(string(value));
+end
 end

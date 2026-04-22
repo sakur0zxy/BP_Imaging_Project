@@ -16,16 +16,27 @@ if ~isstruct(baseStruct) || ~isstruct(overrideStruct)
     return;
 end
 
+if ~isscalar(baseStruct) || ~isscalar(overrideStruct)
+    merged = overrideStruct;
+    return;
+end
+
 merged = baseStruct;
 fields = fieldnames(overrideStruct);
 for idx = 1:numel(fields)
     name = fields{idx};
     value = overrideStruct.(name);
-    if isfield(merged, name) && isstruct(merged.(name)) && isstruct(value)
-        merged.(name) = merge_structs(merged.(name), value);
+    if isfield(merged, name)
+        existingValue = merged.(name);
+    else
+        existingValue = [];
+    end
+
+    if isstruct(existingValue) && isscalar(existingValue) ...
+            && isstruct(value) && isscalar(value)
+        merged.(name) = merge_structs(existingValue, value);
     else
         merged.(name) = value;
     end
 end
 end
-
