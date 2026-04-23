@@ -2,6 +2,14 @@ function tests = test_real_pipeline
 tests = functiontests(localfunctions);
 end
 
+function testDefaultRealConfigDoesNotDegrade(testCase)
+cfg = default_real_config();
+
+verifyFalse(testCase, cfg.degradation.enable);
+verifyEqual(testCase, cfg.degradation.mode, 'none');
+verifyEqual(testCase, cfg.degradation.missingRatio, 0);
+end
+
 function testRealPipelineSmoke(testCase)
 startup();
 

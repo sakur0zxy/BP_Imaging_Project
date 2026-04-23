@@ -47,9 +47,9 @@ config.imaging.outputScale = 7;                % 保留参数
 
 %% 6. 缺失控制
 % mode 仅支持：'none' | 'fixed_gap' | 'random_gap'
-config.degradation.enable = true;              % [bool] 是否启用缺失控制
-config.degradation.mode = 'fixed_gap';              % 缺失模式；实测默认不做缺失
-config.degradation.missingRatio = 0.5;         % [ratio] 目标缺失比例
+config.degradation.enable = false;             % [bool] 实测默认不做缺失控制
+config.degradation.mode = 'none';              % 缺失模式；默认保留完整实测回波
+config.degradation.missingRatio = 0;           % [ratio] 默认缺失比例
 config.degradation.numSegments = 5;            % [count] 缺失分段数
 config.degradation.gapMinMeters = 0;           % [m] 随机缺失最小物理长度
 config.degradation.gapMaxMeters = 100;         % [m] 随机缺失最大物理长度
