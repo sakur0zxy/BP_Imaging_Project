@@ -3,6 +3,10 @@ function files = emit_recovery_evaluation_outputs(recoveryEvaluation, runInfo, ~
 files = struct('matFile', '', 'summaryFile', '', 'panelFile', '', 'panelShown', false);
 outputOptions = evalConfig.outputOptions;
 
+if isfield(outputOptions, 'enable') && ~outputOptions.enable
+    return;
+end
+
 if outputOptions.saveMat && runInfo.enabled
     files.matFile = fullfile(runInfo.matsDir, 'recovery_evaluation.mat');
     safe_save(files.matFile, recoveryEvaluation, 'recoveryEvaluation');

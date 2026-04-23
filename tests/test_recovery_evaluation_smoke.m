@@ -2,6 +2,89 @@ function tests = test_recovery_evaluation_smoke
 tests = functiontests(localfunctions);
 end
 
+function testRecoveryEvaluationModeAutoFollowsProjectMode(testCase)
+startup();
+
+realCfg = load_real_config(struct('analysis', struct( ...
+    'recoveryEvaluation', struct('enable', false))));
+simCfg = load_sim_config(struct('analysis', struct( ...
+    'recoveryEvaluation', struct('enable', false))));
+
+verifyEqual(testCase, realCfg.analysis.recoveryEvaluation.evaluationMode, 'real');
+verifyEqual(testCase, realCfg.analysis.recoveryEvaluation.meta.requestedEvaluationMode, 'auto');
+verifyEqual(testCase, realCfg.analysis.recoveryEvaluation.meta.evaluationModeSource, 'auto-project-mode');
+
+verifyEqual(testCase, simCfg.analysis.recoveryEvaluation.evaluationMode, 'simulation');
+verifyEqual(testCase, simCfg.analysis.recoveryEvaluation.meta.requestedEvaluationMode, 'auto');
+verifyEqual(testCase, simCfg.analysis.recoveryEvaluation.meta.evaluationModeSource, 'auto-project-mode');
+end
+
+function testRecoveryEvaluationModeMismatchFails(testCase)
+startup();
+
+didThrow = false;
+try
+    load_sim_config(struct('analysis', struct( ...
+        'recoveryEvaluation', struct( ...
+            'enable', false, ...
+            'evaluationMode', 'real'))));
+catch errorInfo
+    didThrow = true;
+    verifySubstring(testCase, errorInfo.message, 'evaluationMode=real');
+    verifySubstring(testCase, errorInfo.message, 'project.mode=simulation');
+end
+
+verifyTrue(testCase, didThrow);
+end
+
+function testRecoveryEvaluationOutputMasterSwitch(testCase)
+startup();
+
+tempRunDir = tempname;
+mkdir(tempRunDir);
+cleanup = onCleanup(@() rmdir(tempRunDir, 's')); %#ok<NASGU>
+imagesDir = fullfile(tempRunDir, 'images');
+matsDir = fullfile(tempRunDir, 'mats');
+logsDir = fullfile(tempRunDir, 'logs');
+mkdir(imagesDir);
+mkdir(matsDir);
+mkdir(logsDir);
+
+evalConfig = prepare_recovery_evaluation_config(struct( ...
+    'enable', true, ...
+    'outputs', struct( ...
+        'enable', false, ...
+        'saveMat', true, ...
+        'saveSummary', true, ...
+        'savePanel', true, ...
+        'showPanel', true)), 'sim');
+
+recoveryEvaluation = struct();
+recoveryEvaluation.status = 'completed';
+recoveryEvaluation.config = evalConfig;
+recoveryEvaluation.summary = struct( ...
+    'bestMethodIfAny', 'cs_1d', ...
+    'highLevelFindings', {{'test'}}, ...
+    'riskOrLimitations', {{}});
+recoveryEvaluation.cases = struct();
+
+runInfo = struct( ...
+    'enabled', true, ...
+    'imagesDir', imagesDir, ...
+    'matsDir', matsDir, ...
+    'logsDir', logsDir);
+
+files = emit_recovery_evaluation_outputs(recoveryEvaluation, runInfo, struct(), evalConfig);
+
+verifyEqual(testCase, files.matFile, '');
+verifyEqual(testCase, files.summaryFile, '');
+verifyEqual(testCase, files.panelFile, '');
+verifyFalse(testCase, files.panelShown);
+verifyFalse(testCase, exist(fullfile(imagesDir, 'recovery_evaluation_panel.png'), 'file') == 2);
+verifyFalse(testCase, exist(fullfile(matsDir, 'recovery_evaluation.mat'), 'file') == 2);
+verifyFalse(testCase, exist(fullfile(logsDir, 'recovery_evaluation_summary.txt'), 'file') == 2);
+end
+
 function testRunRecoveryEvaluationSimulation(testCase)
 startup();
 

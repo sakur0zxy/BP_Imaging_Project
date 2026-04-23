@@ -16,9 +16,9 @@ evalConfig = merge_structs(defaults, evalConfig);
 assert(isfield(evalConfig, 'enable') && islogical(evalConfig.enable) && isscalar(evalConfig.enable), ...
     'analysis.recoveryEvaluation.enable 必须是逻辑标量。');
 
-modeText = localNormalizeMode(localGetField(evalConfig, 'evaluationMode', projectMode));
-assert(any(strcmp(modeText, {'real', 'simulation'})), ...
-    'analysis.recoveryEvaluation.evaluationMode 只支持 real 或 simulation。');
+requestedMode = localNormalizeRequestedMode(localGetField(evalConfig, 'evaluationMode', 'auto'));
+projectModeText = localNormalizeMode(projectMode);
+[modeText, modeSource] = localResolveEvaluationMode(requestedMode, projectModeText);
 
 caseNames = localNormalizeCaseNames(localGetField(evalConfig, 'caseNames', defaults.caseNames));
 supportedCaseNames = defaults.caseNames;
@@ -44,6 +44,10 @@ if ~isstruct(meta) || ~isscalar(meta)
 end
 meta.createdBy = 'prepare_recovery_evaluation_config';
 meta.caseNames = caseNames;
+meta.projectMode = projectModeText;
+meta.requestedEvaluationMode = requestedMode;
+meta.resolvedEvaluationMode = modeText;
+meta.evaluationModeSource = modeSource;
 
 evalConfig.mode = modeText;
 evalConfig.evaluationMode = modeText;
@@ -65,10 +69,11 @@ end
 
 defaults = struct();
 defaults.enable = false;
-defaults.evaluationMode = modeText;
+defaults.evaluationMode = 'auto';
 defaults.caseNames = {'full', 'interrupted', 'recovered_cs_1d', 'recovered_cs_2d'};
 defaults.referenceCase = 'full';
 defaults.outputs = struct( ...
+    'enable', true, ...
     'saveMat', true, ...
     'saveSummary', true, ...
     'savePanel', true, ...
@@ -91,7 +96,7 @@ end
 function outputs = localValidateOutputOptions(outputs)
 assert(isstruct(outputs) && isscalar(outputs), ...
     'analysis.recoveryEvaluation.outputs 必须是标量结构体。');
-requiredFields = {'saveMat', 'saveSummary', 'savePanel', 'showPanel'};
+requiredFields = {'enable', 'saveMat', 'saveSummary', 'savePanel', 'showPanel'};
 for idx = 1:numel(requiredFields)
     fieldName = requiredFields{idx};
     assert(isfield(outputs, fieldName) && islogical(outputs.(fieldName)) ...
@@ -190,6 +195,41 @@ switch modeText
     otherwise
         modeText = '';
 end
+end
+
+function requestedMode = localNormalizeRequestedMode(requestedMode)
+requestedMode = lower(char(string(requestedMode)));
+switch requestedMode
+    case {'auto', ''}
+        requestedMode = 'auto';
+    case {'sim', 'simulation'}
+        requestedMode = 'simulation';
+    case {'real'}
+        requestedMode = 'real';
+    otherwise
+        error('analysis.recoveryEvaluation.evaluationMode 只支持 auto、real 或 simulation。');
+end
+end
+
+function [modeText, modeSource] = localResolveEvaluationMode(requestedMode, projectModeText)
+if strcmp(requestedMode, 'auto')
+    if isempty(projectModeText)
+        modeText = 'simulation';
+        modeSource = 'auto-default-simulation';
+    else
+        modeText = projectModeText;
+        modeSource = 'auto-project-mode';
+    end
+    return;
+end
+
+if ~isempty(projectModeText) && ~strcmp(requestedMode, projectModeText)
+    error('analysis.recoveryEvaluation.evaluationMode=%s 与 project.mode=%s 不匹配。默认建议使用 auto，或手动选择匹配当前数据流程的模式。', ...
+        requestedMode, projectModeText);
+end
+
+modeText = requestedMode;
+modeSource = 'manual';
 end
 
 function value = localGetField(data, fieldName, defaultValue)

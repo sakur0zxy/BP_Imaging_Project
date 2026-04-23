@@ -68,11 +68,13 @@
 - `analysis.recoveryEvaluation.enable`
   是否启用独立的恢复效果评估模块。
 - `analysis.recoveryEvaluation.evaluationMode`
-  评估口径，支持 `real` 和 `simulation`。
+  评估口径，支持 `auto`、`real` 和 `simulation`。默认 `auto` 跟随 `project.mode`：real 流程解析为 `real`，sim 流程解析为 `simulation`。手动指定时必须与当前数据流程匹配。
 - `analysis.recoveryEvaluation.caseNames`
   当前固定为 `full / interrupted / recovered_cs_1d / recovered_cs_2d`。
 - `analysis.recoveryEvaluation.referenceCase`
   默认参考 case，当前固定为 `full`。
+- `analysis.recoveryEvaluation.outputs.enable`
+  评估输出总开关。设为 `false` 时，不保存 mat、不写 summary、不保存 panel，也不弹出 panel。
 - `analysis.recoveryEvaluation.outputs.saveMat`
   是否保存完整 `recoveryEvaluation` 结构。
 - `analysis.recoveryEvaluation.outputs.saveSummary`
