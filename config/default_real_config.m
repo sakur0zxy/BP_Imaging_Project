@@ -58,7 +58,7 @@ config.degradation.randomSeed = [];            % [int] 随机种子
 
 %% 7. 恢复
 % recovery.method 正式支持：'cs_1d' | 'cs_2d'
-config.recovery.enable = true;                % [bool] 是否启用恢复
+config.recovery.enable = false;               % [bool] 实测默认关闭恢复；有缺失实验时再手动开启
 config.recovery.method = 'cs_1d';              % 恢复方法名
 config.recovery.common = struct( ...
     'maxIter', 80, ...                         % [count] 最大迭代次数
@@ -89,7 +89,7 @@ config.analysis.imageQuality = struct( ...
     'compareMode', 'amplitude');               % 'amplitude' | 'complex'
 
 config.analysis.recoveryEvaluation = struct( ...
-    'enable', true, ...                       % [bool] 是否启用恢复效果评估
+    'enable', false, ...                      % [bool] 实测默认关闭恢复评估；做恢复实验时再手动开启
     'evaluationMode', 'auto', ...              % 'auto' 默认跟随 real/sim 流程；也可手动写 'real' | 'simulation'
     'caseNames', {{'full', 'interrupted', 'recovered_cs_1d', 'recovered_cs_2d'}}, ...
     'referenceCase', 'full', ...               % 对比参考 case

@@ -128,11 +128,12 @@ log.info('Real-data pipeline finished in %.3fs.', result.summary.pipelineElapsed
 end
 
 function tf = localCanReuseReferenceImage(config, degradationInfo, recoveryResult)
-tf = ~config.degradation.enable ...
+sourceUnchangedByDegradation = ~config.degradation.enable ...
     || strcmpi(degradationInfo.mode, 'none') ...
     || degradationInfo.totalMissing == 0;
-tf = tf && ~config.recovery.enable;
-tf = tf && strcmp(recoveryResult.status, 'disabled');
+sourceUnchangedByRecovery = ~config.recovery.enable ...
+    || any(strcmpi(recoveryResult.status, {'disabled', 'skipped'}));
+tf = sourceUnchangedByDegradation && sourceUnchangedByRecovery;
 end
 
 function textValue = localStringOrEmpty(value)
