@@ -9,9 +9,9 @@ summary.modeSpecificNotes = {};
 summary.meta = struct('evaluationMode', evalConfig.evaluationMode);
 
 if strcmp(evalConfig.evaluationMode, 'simulation')
-    summary = localSummarizeSimulation(summary, comparisonResults);
+    summary = localSummarizeSimulation(summary, caseResults, comparisonResults);
 else
-    summary = localSummarizeReal(summary, comparisonResults);
+    summary = localSummarizeReal(summary, caseResults, comparisonResults);
 end
 
 summary.riskOrLimitations = [summary.riskOrLimitations, localCollectStatusRisks(caseResults, comparisonResults)]; %#ok<AGROW>
@@ -19,7 +19,7 @@ summary.meta.caseNames = fieldnames(caseResults);
 summary.meta.comparisonNames = fieldnames(comparisonResults);
 end
 
-function summary = localSummarizeSimulation(summary, comparisonResults)
+function summary = localSummarizeSimulation(summary, caseResults, comparisonResults)
 interruptedGap = localGetMetricValue(comparisonResults, 'full_vs_interrupted', 'relativeL2Error', NaN);
 psnrInterrupted = localGetMetricValue(comparisonResults, 'full_vs_interrupted', 'psnr', NaN);
 
@@ -27,19 +27,26 @@ methodNames = {'cs_1d', 'cs_2d'};
 scores = nan(1, numel(methodNames));
 for idx = 1:numel(methodNames)
     methodName = methodNames{idx};
+    recoveredCaseName = ['recovered_', methodName];
+    recoveredStatus = localGetCaseStatus(caseResults, recoveredCaseName);
     comparisonName = ['full_vs_recovered_', methodName];
     relL2 = localGetMetricValue(comparisonResults, comparisonName, 'relativeL2Error', NaN);
     psnrValue = localGetMetricValue(comparisonResults, comparisonName, 'psnr', NaN);
     corrValue = localGetMetricValue(comparisonResults, comparisonName, 'normalizedCorrelation', NaN);
 
     improved = isfinite(interruptedGap) && isfinite(relL2) && relL2 < interruptedGap;
-    summary.perCaseFindings.(['recovered_', methodName]) = struct( ...
+    summary.perCaseFindings.(recoveredCaseName) = struct( ...
+        'status', recoveredStatus, ...
         'closerToFullThanInterrupted', improved, ...
         'relativeL2Error', relL2, ...
         'psnr', psnrValue, ...
         'normalizedCorrelation', corrValue);
 
-    if improved
+    if ~strcmp(recoveredStatus, 'completed')
+        summary.highLevelFindings{end + 1} = sprintf('%s 恢复未完成，状态为 %s。', ...
+            upper(methodName), recoveredStatus); %#ok<AGROW>
+        continue;
+    elseif improved
         summary.highLevelFindings{end + 1} = sprintf('%s 相比 interrupted 更接近 full。', upper(methodName)); %#ok<AGROW>
     else
         summary.highLevelFindings{end + 1} = sprintf('%s 没有明显优于 interrupted。', upper(methodName)); %#ok<AGROW>
@@ -53,12 +60,7 @@ for idx = 1:numel(methodNames)
     end
 end
 
-if all(isnan(scores))
-    summary.bestMethodIfAny = '';
-else
-    [~, bestIdx] = max(scores);
-    summary.bestMethodIfAny = methodNames{bestIdx};
-end
+summary.bestMethodIfAny = localPickBestFiniteScore(methodNames, scores);
 
 if ~isempty(summary.bestMethodIfAny)
     summary.highLevelFindings{end + 1} = sprintf('仿真口径下更优的方法是 %s。', upper(summary.bestMethodIfAny));
@@ -70,7 +72,7 @@ summary.modeSpecificNotes = { ...
         psnrInterrupted, interruptedGap)};
 end
 
-function summary = localSummarizeReal(summary, comparisonResults)
+function summary = localSummarizeReal(summary, caseResults, comparisonResults)
 interruptedCloseness = localGetMetricValue(comparisonResults, 'full_vs_interrupted', 'closenessScore', NaN);
 
 methodNames = {'cs_1d', 'cs_2d'};
@@ -79,6 +81,8 @@ improvementVotes = nan(1, numel(methodNames));
 
 for idx = 1:numel(methodNames)
     methodName = methodNames{idx};
+    recoveredCaseName = ['recovered_', methodName];
+    recoveredStatus = localGetCaseStatus(caseResults, recoveredCaseName);
     fullComparison = ['full_vs_recovered_', methodName];
     interruptedComparison = ['interrupted_vs_recovered_', methodName];
 
@@ -90,26 +94,31 @@ for idx = 1:numel(methodNames)
     closerThanInterrupted = isfinite(interruptedCloseness) && isfinite(closenessScores(idx)) ...
         && closenessScores(idx) < interruptedCloseness;
 
-    summary.perCaseFindings.(['recovered_', methodName]) = struct( ...
+    summary.perCaseFindings.(recoveredCaseName) = struct( ...
+        'status', recoveredStatus, ...
         'improvementVotes', improvementVotes(idx), ...
         'closenessToFull', closenessScores(idx), ...
         'closerToFullThanInterrupted', closerThanInterrupted, ...
         'peakShiftPixels', peakShiftPixels);
 
-    if improved || closerThanInterrupted
+    if ~strcmp(recoveredStatus, 'completed')
+        summary.highLevelFindings{end + 1} = sprintf('%s 恢复未完成，状态为 %s。', ...
+            upper(methodName), recoveredStatus); %#ok<AGROW>
+        continue;
+    elseif improved || closerThanInterrupted
         summary.highLevelFindings{end + 1} = sprintf('%s 在实测口径下优于 interrupted。', upper(methodName)); %#ok<AGROW>
     else
         summary.highLevelFindings{end + 1} = sprintf('%s 在实测口径下没有明显优于 interrupted。', upper(methodName)); %#ok<AGROW>
     end
 end
 
-if all(isnan(closenessScores))
-    summary.bestMethodIfAny = '';
-else
-    scoreVector = -closenessScores + improvementVotes / 10;
-    [~, bestIdx] = max(scoreVector);
-    summary.bestMethodIfAny = methodNames{bestIdx};
+scoreVector = -closenessScores + improvementVotes / 10;
+for idx = 1:numel(methodNames)
+    if ~strcmp(localGetCaseStatus(caseResults, ['recovered_', methodNames{idx}]), 'completed')
+        scoreVector(idx) = NaN;
+    end
 end
+summary.bestMethodIfAny = localPickBestFiniteScore(methodNames, scoreVector);
 
 if ~isempty(summary.bestMethodIfAny)
     summary.highLevelFindings{end + 1} = sprintf('实测口径下更优的方法是 %s。', upper(summary.bestMethodIfAny));
@@ -137,6 +146,26 @@ for idx = 1:numel(comparisonNames)
     if ~strcmp(comparisonStatus, 'completed')
         risks{end + 1} = sprintf('Comparison %s status=%s。', comparisonNames{idx}, comparisonStatus); %#ok<AGROW>
     end
+end
+end
+
+function bestMethod = localPickBestFiniteScore(methodNames, scores)
+bestMethod = '';
+valid = isfinite(scores);
+if ~any(valid)
+    return;
+end
+
+validScores = scores(valid);
+validMethods = methodNames(valid);
+[~, bestIdx] = max(validScores);
+bestMethod = validMethods{bestIdx};
+end
+
+function status = localGetCaseStatus(caseResults, caseName)
+status = 'completed';
+if isstruct(caseResults) && isfield(caseResults, caseName)
+    status = localGetField(caseResults.(caseName), 'status', 'completed');
 end
 end
 

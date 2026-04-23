@@ -76,9 +76,10 @@ analysisResult = localRunCaseAnalysis(imageResult, fullImage, config, evalConfig
 artifacts.analysisResult = analysisResult;
 
 caseMetrics = localBuildCaseMetrics(imageResult, analysisResult, recoveryResult, artifacts.cacheInfo);
-caseStatus = 'completed';
+caseStatus = localResolveCaseStatus(caseItem, recoveryResult, analysisResult);
+caseMessages = messages;
 if isfield(analysisResult, 'status') && strcmp(analysisResult.status, 'partial')
-    caseStatus = 'partial';
+    caseMessages{end + 1} = sprintf('Case %s analysis status=partial.', caseItem.caseName);
 end
 
 caseResult = build_case_result( ...
@@ -86,8 +87,24 @@ caseResult = build_case_result( ...
     caseMetrics, ...
     artifacts, ...
     caseStatus, ...
-    messages, ...
+    caseMessages, ...
     struct('displayName', localGetField(caseItem.meta, 'displayName', caseItem.caseName)));
+end
+
+function caseStatus = localResolveCaseStatus(caseItem, recoveryResult, analysisResult)
+caseStatus = 'completed';
+
+if strcmp(caseItem.caseType, 'recovered')
+    recoveryStatus = localGetField(recoveryResult, 'status', 'completed');
+    if ~strcmp(recoveryStatus, 'completed')
+        caseStatus = recoveryStatus;
+        return;
+    end
+end
+
+if isfield(analysisResult, 'status') && strcmp(analysisResult.status, 'partial')
+    caseStatus = 'partial';
+end
 end
 
 function [imageResult, cacheInfo] = localResolveFullImage(caseItem, config)
