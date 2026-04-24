@@ -37,6 +37,46 @@ end
 verifyTrue(testCase, didThrow);
 end
 
+function testConfigLoadWorksWhenRecoveryEvaluationModuleAbsentAndDisabled(testCase)
+startup();
+cleanup = localRemoveRecoveryEvaluationModuleFromPath(); %#ok<NASGU>
+
+realCfg = load_real_config();
+simCfg = load_sim_config();
+
+verifyFalse(testCase, realCfg.analysis.recoveryEvaluation.enable);
+verifyEqual(testCase, realCfg.analysis.recoveryEvaluation.evaluationMode, 'real');
+verifyFalse(testCase, realCfg.analysis.recoveryEvaluation.meta.moduleAvailable);
+
+verifyFalse(testCase, simCfg.analysis.recoveryEvaluation.enable);
+verifyEqual(testCase, simCfg.analysis.recoveryEvaluation.evaluationMode, 'simulation');
+verifyFalse(testCase, simCfg.analysis.recoveryEvaluation.meta.moduleAvailable);
+end
+
+function testConfigLoadFailsClearlyWhenRecoveryEvaluationAbsentButEnabled(testCase)
+startup();
+cleanup = localRemoveRecoveryEvaluationModuleFromPath(); %#ok<NASGU>
+
+verifyError(testCase, @() load_sim_config(struct('analysis', struct( ...
+    'recoveryEvaluation', struct('enable', true)))), ...
+    'prepare_optional_recovery_evaluation_config:ModuleMissing');
+verifyError(testCase, @() load_real_config(struct('analysis', struct( ...
+    'recoveryEvaluation', struct('enable', true)))), ...
+    'prepare_optional_recovery_evaluation_config:ModuleMissing');
+end
+
+function testOptionalRecoveryEvaluationWrapperSkipsAbsentModuleWhenDisabled(testCase)
+startup();
+cleanup = localRemoveRecoveryEvaluationModuleFromPath(); %#ok<NASGU>
+
+cfg = load_real_config();
+result = run_optional_recovery_evaluation(cfg, struct());
+
+verifyFalse(testCase, result.enabled);
+verifyEqual(testCase, result.status, 'disabled');
+verifyEqual(testCase, result.reason, 'recovery-evaluation-disabled');
+end
+
 function testRecoveryEvaluationOutputMasterSwitch(testCase)
 startup();
 
@@ -323,4 +363,22 @@ comparison.metrics.metricInterpretation = struct();
 comparison.metrics.validity = true;
 comparison.metrics.status = 'completed';
 comparison.metrics.meta = struct();
+end
+
+function cleanup = localRemoveRecoveryEvaluationModuleFromPath()
+projectRoot = fileparts(which('startup'));
+moduleDir = fullfile(projectRoot, 'src', 'analysis', 'recovery_evaluation');
+modulePath = genpath(moduleDir);
+rmpath(modulePath);
+clear('prepare_recovery_evaluation_config', ...
+    'build_recovery_evaluation_cases', ...
+    'evaluate_recovery_cases', ...
+    'summarize_recovery_evaluation', ...
+    'compute_sim_recovery_metrics', ...
+    'compute_real_recovery_metrics', ...
+    'build_case_result', ...
+    'build_comparison_result', ...
+    'emit_recovery_evaluation_outputs', ...
+    'plot_recovery_evaluation_panel');
+cleanup = onCleanup(@() addpath(modulePath));
 end

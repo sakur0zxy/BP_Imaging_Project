@@ -5,7 +5,7 @@ if nargin < 2 || isempty(context)
 end
 
 moduleConfig = localGetRecoveryEvaluationConfig(config);
-evalConfig = prepare_recovery_evaluation_config(moduleConfig, localGetProjectMode(config));
+evalConfig = prepare_optional_recovery_evaluation_config(moduleConfig, localGetProjectMode(config));
 
 result = struct();
 result.enabled = evalConfig.enable;
