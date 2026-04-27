@@ -9,7 +9,7 @@
 
 - [ ] **ARCH-01**: 仓库目录必须与用户给出的新架构保持一致
 - [ ] **ARCH-02**: 实测与仿真流程必须通过不同主入口和不同配置加载器启动
-- [ ] **ARCH-03**: 核心源码必须按 pipelines/data/contracts/bp_core/cs_recovery/analysis/output/runtime/utils 分层
+- [ ] **ARCH-03**: 核心源码必须按 pipelines/data/contracts/bp_core/recovery/analysis/output/runtime/utils 分层
 
 ### Configuration
 
@@ -86,4 +86,3 @@
 ---
 *Requirements defined: 2026-04-21*
 *Last updated: 2026-04-21 after Phase 1 scaffold start*
-

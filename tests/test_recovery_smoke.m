@@ -1,44 +1,64 @@
-function tests = test_cs_recovery_smoke
+function tests = test_recovery_smoke
 tests = functiontests(localfunctions);
 end
 
-function testBuildMeasurementModel(testCase)
+function testBuildRecoveryProblem(testCase)
 startup();
 
 [sourceFull, sourceCut] = localBuildRecoveryCase();
-model = build_measurement_model(sourceCut, sourceFull);
+problem = build_recovery_problem(sourceCut, sourceFull);
 
-verifyEqual(testCase, size(model.observedEcho), size(sourceCut.echo));
-verifyEqual(testCase, model.totalMissingSamples, size(sourceCut.echo, 1) * 6);
-verifyTrue(testCase, model.hasReference);
-verifyEqual(testCase, model.observedAzimuthMask(10:15), false(1, 6));
+verifyEqual(testCase, size(problem.observedEcho), size(sourceCut.echo));
+verifyEqual(testCase, problem.totalMissingSamples, size(sourceCut.echo, 1) * 6);
+verifyTrue(testCase, problem.hasReference);
+verifyEqual(testCase, problem.observedAzimuthMask(10:15), false(1, 6));
 end
 
-function testRunCsRecovery1D(testCase)
+function testRunRecoveryCs1D(testCase)
 startup();
 
 [sourceFull, sourceCut] = localBuildRecoveryCase();
-cfg = localRecoveryConfig('1d');
-result = run_cs_recovery(sourceCut, cfg, sourceFull);
+cfg = localRecoveryConfig('cs_1d');
+result = run_recovery(sourceCut, cfg, sourceFull);
 
 verifyEqual(testCase, result.status, 'completed');
-verifyEqual(testCase, result.method, '1d');
+verifyEqual(testCase, result.method, 'cs_1d');
 verifyGreaterThan(testCase, result.recoveryInfo.iterations, 0);
 verifyLessThanOrEqual(testCase, result.metrics.observedConsistencyErr, 1e-12);
 verifyEqual(testCase, result.echo(:, sourceCut.mask), sourceCut.echo(:, sourceCut.mask), 'AbsTol', 1e-12);
 end
 
-function testRunCsRecovery2D(testCase)
+function testRunRecoveryCs2D(testCase)
 startup();
 
 [sourceFull, sourceCut] = localBuildRecoveryCase();
-cfg = localRecoveryConfig('2d');
-result = run_cs_recovery(sourceCut, cfg, sourceFull);
+cfg = localRecoveryConfig('cs_2d');
+result = run_recovery(sourceCut, cfg, sourceFull);
 
 verifyEqual(testCase, result.status, 'completed');
-verifyEqual(testCase, result.method, '2d');
+verifyEqual(testCase, result.method, 'cs_2d');
 verifyGreaterThan(testCase, result.recoveryInfo.iterations, 0);
 verifyLessThanOrEqual(testCase, result.metrics.observedConsistencyErr, 1e-12);
+end
+
+function testMethodUseFistaOverridesCommon(testCase)
+startup();
+
+[sourceFull, sourceCut] = localBuildRecoveryCase();
+
+cfg1d = localRecoveryConfig('cs_1d');
+cfg1d.common.useFista = false;
+cfg1d.methods.cs_1d.useFista = true;
+result1d = run_recovery(sourceCut, cfg1d, sourceFull);
+verifyEqual(testCase, result1d.status, 'completed');
+verifyTrue(testCase, result1d.recoveryInfo.useFista);
+
+cfg2d = localRecoveryConfig('cs_2d');
+cfg2d.common.useFista = false;
+cfg2d.methods.cs_2d.useFista = true;
+result2d = run_recovery(sourceCut, cfg2d, sourceFull);
+verifyEqual(testCase, result2d.status, 'completed');
+verifyTrue(testCase, result2d.recoveryInfo.useFista);
 end
 
 function [sourceFull, sourceCut] = localBuildRecoveryCase()
@@ -71,12 +91,14 @@ function cfg = localRecoveryConfig(methodName)
 cfg = struct( ...
     'enable', true, ...
     'method', methodName, ...
-    'lambda1D', 0.02, ...
-    'lambda2D', 0.01, ...
-    'maxIter', 15, ...
-    'tol', 1e-4, ...
-    'useFista', true, ...
-    'normalizeInput', true, ...
-    'verbose', false, ...
-    'skipWhenNoMissing', true);
+    'common', struct( ...
+        'maxIter', 15, ...
+        'tol', 1e-4, ...
+        'useFista', true, ...
+        'normalizeInput', true, ...
+        'verbose', false, ...
+        'skipWhenNoMissing', true), ...
+    'methods', struct( ...
+        'cs_1d', struct('lambda', 0.02), ...
+        'cs_2d', struct('lambda', 0.01)));
 end

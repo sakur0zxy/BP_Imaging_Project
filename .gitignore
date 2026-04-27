@@ -8,3 +8,4 @@ results/real_runs/
 results/sim_runs/
 *.asv
 *.autosave
+backups

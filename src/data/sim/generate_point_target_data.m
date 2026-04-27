@@ -41,10 +41,7 @@ if ~config.scene.inheritRealTrack && ~config.radar.inheritRealRadar
 end
 
 try
-    realConfig = load_real_config(struct( ...
-        'degradation', struct('enable', false, 'mode', 'none'), ...
-        'analysis', struct('enablePointAnalysis', false), ...
-        'output', struct('enableSave', false)));
+    realConfig = load_real_config(localBuildRealInheritOverrides(config));
     realData = load_gotcha_data(realConfig);
     inheritData.track = realData.track;
     inheritData.radar = realData.radar;
@@ -53,6 +50,36 @@ try
 catch errorInfo
     inheritInfo.available = false;
     inheritInfo.reason = errorInfo.identifier;
+    error('generate_point_target_data:RealInheritFailed', ...
+        ['仿真配置要求继承实测 GOTCHA 轨迹或雷达参数，但读取实测数据失败。', ...
+        '原始错误：%s。请检查 real 数据路径和 source 配置；', ...
+        '如果想使用手动仿真参数，请将 config.scene.inheritRealTrack=false，', ...
+        '并将 config.radar.inheritRealRadar=false。'], errorInfo.message);
+end
+end
+
+function overrides = localBuildRealInheritOverrides(config)
+overrides = struct( ...
+    'degradation', struct('enable', false, 'mode', 'none'), ...
+    'analysis', struct( ...
+        'enablePointAnalysis', false, ...
+        'recoveryEvaluation', struct('enable', false)), ...
+    'output', struct('enableSave', false));
+
+pathOverrides = struct();
+if isfield(config, 'path') && isstruct(config.path)
+    if isfield(config.path, 'projectRoot') && ~isempty(config.path.projectRoot)
+        pathOverrides.projectRoot = config.path.projectRoot;
+    end
+    if isfield(config.path, 'realDataRoot')
+        pathOverrides.realDataRoot = config.path.realDataRoot;
+    end
+    if isfield(config.path, 'realDataCandidates')
+        pathOverrides.realDataCandidates = config.path.realDataCandidates;
+    end
+end
+if ~isempty(fieldnames(pathOverrides))
+    overrides.path = pathOverrides;
 end
 end
 

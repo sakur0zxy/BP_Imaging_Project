@@ -107,11 +107,13 @@ metrics.peakValue = max(abs(profile(:)));
 end
 
 function rotationInfo = localRotateIfNeeded(imageData, analysisConfig)
-estimatedTiltDeg = localEstimateTilt(imageData, analysisConfig.tiltEdgeFraction);
+tiltInfo = localEstimateTilt(imageData, analysisConfig);
+estimatedTiltDeg = tiltInfo.estimatedTiltDeg;
 appliedRotationDeg = 0;
 rotatedImage = imageData;
 
 if analysisConfig.enableTiltCorrection ...
+        && strcmp(tiltInfo.status, 'completed') ...
         && abs(estimatedTiltDeg) >= analysisConfig.tiltThresholdDeg
     appliedRotationDeg = -estimatedTiltDeg;
     rotatedImage = localRotateComplex(imageData, appliedRotationDeg);
@@ -119,10 +121,9 @@ end
 
 rotationInfo = struct();
 rotationInfo.image = rotatedImage;
-rotationInfo.meta = struct( ...
-    'estimatedTiltDeg', estimatedTiltDeg, ...
-    'appliedRotationDeg', appliedRotationDeg, ...
-    'enabled', analysisConfig.enableTiltCorrection);
+rotationInfo.meta = tiltInfo;
+rotationInfo.meta.appliedRotationDeg = appliedRotationDeg;
+rotationInfo.meta.enabled = analysisConfig.enableTiltCorrection;
 end
 
 function [xProfile, yProfile] = localBuildProfiles(imageData, peakPosition)
@@ -315,10 +316,24 @@ else
 end
 end
 
-function tiltDeg = localEstimateTilt(imageData, edgeFraction)
+function tiltInfo = localEstimateTilt(imageData, analysisConfig)
+method = lower(char(string(analysisConfig.tiltMethod)));
+switch method
+    case 'sidelobe_ring'
+        tiltInfo = localEstimateTiltBySidelobeRing(imageData, analysisConfig);
+    case 'legacy_edge_fit'
+        tiltInfo = localEstimateTiltByEdgeFit(imageData, analysisConfig.tiltEdgeFraction);
+    otherwise
+        error('point_target_analysis:InvalidTiltMethod', ...
+            'analysis.pointTarget.tiltMethod 只支持 sidelobe_ring 或 legacy_edge_fit。');
+end
+end
+
+function tiltInfo = localEstimateTiltByEdgeFit(imageData, edgeFraction)
 amplitude = abs(imageData);
 if isempty(amplitude) || max(amplitude(:)) <= 0
-    tiltDeg = 0;
+    tiltInfo = localBuildTiltInfo('legacy_edge_fit', 'skipped', 0, ...
+        'empty-or-zero-image', 0, NaN, []);
     return;
 end
 
@@ -328,14 +343,16 @@ edgeCount = ceil(numCols * edgeFraction);
 edgeCount = max(edgeCount, 1);
 edgeCount = min(edgeCount, floor(numCols / 2));
 if edgeCount < 1
-    tiltDeg = 0;
+    tiltInfo = localBuildTiltInfo('legacy_edge_fit', 'skipped', 0, ...
+        'not-enough-edge-columns', 0, NaN, []);
     return;
 end
 
 usedCols = [1:edgeCount, (numCols - edgeCount + 1):numCols];
 usedCols = unique(usedCols(:));
 if numel(usedCols) < 2
-    tiltDeg = 0;
+    tiltInfo = localBuildTiltInfo('legacy_edge_fit', 'skipped', 0, ...
+        'not-enough-edge-columns', numel(usedCols), NaN, []);
     return;
 end
 
@@ -348,6 +365,139 @@ if tiltDeg > 45
 elseif tiltDeg <= -45
     tiltDeg = tiltDeg + 90;
 end
+tiltInfo = localBuildTiltInfo('legacy_edge_fit', 'completed', tiltDeg, ...
+    '', numel(usedCols), NaN, []);
+tiltInfo.edgeFraction = edgeFraction;
+end
+
+function tiltInfo = localEstimateTiltBySidelobeRing(imageData, analysisConfig)
+amplitude = abs(imageData);
+peakValue = max(amplitude(:));
+if isempty(amplitude) || peakValue <= 0
+    tiltInfo = localBuildTiltInfo('sidelobe_ring', 'skipped', 0, ...
+        'empty-or-zero-image', 0, NaN, []);
+    return;
+end
+
+peakPosition = localFindPeak(amplitude);
+[height, width] = size(amplitude);
+[rowGrid, colGrid] = ndgrid(1:height, 1:width);
+xValue = colGrid - peakPosition(2);
+yValue = rowGrid - peakPosition(1);
+radius = hypot(xValue, yValue);
+relativeDb = 20 * log10(amplitude / peakValue + eps);
+
+[minRadius, maxRadius] = localResolveTiltRadius(analysisConfig, height, width);
+ringMask = radius >= minRadius ...
+    & radius <= maxRadius ...
+    & relativeDb <= analysisConfig.tiltMainlobeExcludeDb ...
+    & relativeDb >= analysisConfig.tiltSidelobeFloorDb;
+validPixelCount = nnz(ringMask);
+if validPixelCount < analysisConfig.tiltMinValidPixels
+    tiltInfo = localBuildTiltInfo('sidelobe_ring', 'skipped', 0, ...
+        'not-enough-ring-pixels', validPixelCount, NaN, []);
+    tiltInfo.minRadiusPixels = minRadius;
+    tiltInfo.maxRadiusPixels = maxRadius;
+    return;
+end
+
+foldedAngles = localFoldAngle90(atan2d(yValue(ringMask), xValue(ringMask)));
+weights = (amplitude(ringMask) / peakValue).^2;
+weights = min(weights, 10^(analysisConfig.tiltMainlobeExcludeDb / 10));
+
+binWidth = analysisConfig.tiltAngleBinDeg;
+binEdges = -45:binWidth:45;
+if binEdges(end) < 45
+    binEdges(end + 1) = 45; %#ok<AGROW>
+end
+binCenters = binEdges(1:end-1) + diff(binEdges) / 2;
+angleEnergy = zeros(1, numel(binCenters));
+for idx = 1:numel(binCenters)
+    if idx == numel(binCenters)
+        inBin = foldedAngles >= binEdges(idx) & foldedAngles <= binEdges(idx + 1);
+    else
+        inBin = foldedAngles >= binEdges(idx) & foldedAngles < binEdges(idx + 1);
+    end
+    angleEnergy(idx) = sum(weights(inBin));
+end
+
+angleEnergy = localSmoothCircularEnergy(angleEnergy);
+[peakEnergy, peakIndex] = max(angleEnergy);
+positiveEnergy = angleEnergy(angleEnergy > 0);
+if isempty(positiveEnergy) || peakEnergy <= 0
+    tiltInfo = localBuildTiltInfo('sidelobe_ring', 'skipped', 0, ...
+        'empty-angle-energy', validPixelCount, NaN, angleEnergy);
+    return;
+end
+
+baselineEnergy = median(positiveEnergy);
+peakContrast = peakEnergy / max(baselineEnergy, eps);
+if peakContrast < analysisConfig.tiltMinPeakContrast
+    tiltInfo = localBuildTiltInfo('sidelobe_ring', 'skipped', 0, ...
+        'weak-angle-peak', validPixelCount, peakContrast, angleEnergy);
+    tiltInfo.minRadiusPixels = minRadius;
+    tiltInfo.maxRadiusPixels = maxRadius;
+    return;
+end
+
+tiltDeg = localNormalizeAngle(binCenters(peakIndex));
+if tiltDeg > 45
+    tiltDeg = tiltDeg - 90;
+elseif tiltDeg <= -45
+    tiltDeg = tiltDeg + 90;
+end
+tiltInfo = localBuildTiltInfo('sidelobe_ring', 'completed', tiltDeg, ...
+    '', validPixelCount, peakContrast, angleEnergy);
+tiltInfo.minRadiusPixels = minRadius;
+tiltInfo.maxRadiusPixels = maxRadius;
+tiltInfo.angleBinDeg = binWidth;
+tiltInfo.mainlobeExcludeDb = analysisConfig.tiltMainlobeExcludeDb;
+tiltInfo.sidelobeFloorDb = analysisConfig.tiltSidelobeFloorDb;
+end
+
+function tiltInfo = localBuildTiltInfo(method, status, tiltDeg, reason, validPixelCount, peakContrast, angleEnergy)
+tiltInfo = struct();
+tiltInfo.method = method;
+tiltInfo.status = status;
+tiltInfo.reason = reason;
+tiltInfo.estimatedTiltDeg = tiltDeg;
+tiltInfo.validPixelCount = validPixelCount;
+tiltInfo.peakContrast = peakContrast;
+tiltInfo.angleEnergy = angleEnergy;
+end
+
+function [minRadius, maxRadius] = localResolveTiltRadius(analysisConfig, height, width)
+if isempty(analysisConfig.tiltMinRadiusPixels)
+    minRadius = max(2, round(0.5 * analysisConfig.upsampleFactor));
+else
+    minRadius = analysisConfig.tiltMinRadiusPixels;
+end
+
+if isempty(analysisConfig.tiltMaxRadiusPixels)
+    maxRadius = max(minRadius + 1, floor(0.35 * min(height, width)));
+else
+    maxRadius = analysisConfig.tiltMaxRadiusPixels;
+end
+
+maxAllowedRadius = floor(0.5 * min(height, width));
+minRadius = max(0, minRadius);
+maxRadius = min(maxRadius, maxAllowedRadius);
+if maxRadius <= minRadius
+    maxRadius = min(maxAllowedRadius, minRadius + 1);
+end
+end
+
+function foldedAngle = localFoldAngle90(angleDeg)
+foldedAngle = mod(angleDeg + 45, 90) - 45;
+end
+
+function smoothedEnergy = localSmoothCircularEnergy(angleEnergy)
+if numel(angleEnergy) < 3
+    smoothedEnergy = angleEnergy;
+    return;
+end
+
+smoothedEnergy = (circshift(angleEnergy, [0, 1]) + angleEnergy + circshift(angleEnergy, [0, -1])) / 3;
 end
 
 function angleOut = localNormalizeAngle(angleIn)
@@ -384,13 +534,35 @@ analysisConfig = struct( ...
     'upsampleFactor', 16, ...
     'enableTiltCorrection', true, ...
     'tiltThresholdDeg', 0.0, ...
-    'tiltEdgeFraction', 0.2);
+    'tiltEdgeFraction', 0.2, ...
+    'tiltMethod', 'sidelobe_ring', ...
+    'tiltMainlobeExcludeDb', -6, ...
+    'tiltSidelobeFloorDb', -35, ...
+    'tiltMinRadiusPixels', [], ...
+    'tiltMaxRadiusPixels', [], ...
+    'tiltAngleBinDeg', 1, ...
+    'tiltMinValidPixels', 30, ...
+    'tiltMinPeakContrast', 1.5);
 
 if isfield(config, 'analysis') && isstruct(config.analysis) ...
         && isfield(config.analysis, 'pointTarget') ...
         && isstruct(config.analysis.pointTarget)
     analysisConfig = merge_structs(analysisConfig, config.analysis.pointTarget);
 end
+
+analysisConfig.tiltMethod = lower(char(string(analysisConfig.tiltMethod)));
+assert(any(strcmp(analysisConfig.tiltMethod, {'sidelobe_ring', 'legacy_edge_fit'})), ...
+    'analysis.pointTarget.tiltMethod 只支持 sidelobe_ring 或 legacy_edge_fit。');
+assert(analysisConfig.tiltAngleBinDeg > 0 && analysisConfig.tiltAngleBinDeg <= 15, ...
+    'analysis.pointTarget.tiltAngleBinDeg 必须位于 (0, 15]。');
+assert(analysisConfig.tiltMainlobeExcludeDb < 0, ...
+    'analysis.pointTarget.tiltMainlobeExcludeDb 必须小于 0。');
+assert(analysisConfig.tiltSidelobeFloorDb < analysisConfig.tiltMainlobeExcludeDb, ...
+    'analysis.pointTarget.tiltSidelobeFloorDb 必须小于 tiltMainlobeExcludeDb。');
+assert(analysisConfig.tiltMinValidPixels >= 1, ...
+    'analysis.pointTarget.tiltMinValidPixels 必须大于等于 1。');
+assert(analysisConfig.tiltMinPeakContrast >= 1, ...
+    'analysis.pointTarget.tiltMinPeakContrast 必须大于等于 1。');
 end
 
 function options = localGetImageQualityOptions(config)
