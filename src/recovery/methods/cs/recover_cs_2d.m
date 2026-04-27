@@ -3,8 +3,7 @@ function result = recover_cs_2d(problem, methodConfig, commonConfig)
 assert(isfield(methodConfig, 'lambda') && methodConfig.lambda >= 0, ...
     'cs_2d.lambda 必须大于等于 0。');
 
-solverConfig = commonConfig;
-solverConfig.lambda = methodConfig.lambda;
+solverConfig = merge_structs(commonConfig, methodConfig);
 
 [echoRec, info] = run_fista_sparse_recovery( ...
     problem.observedEcho, ...

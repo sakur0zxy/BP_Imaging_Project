@@ -68,6 +68,9 @@ overrides = struct( ...
 
 pathOverrides = struct();
 if isfield(config, 'path') && isstruct(config.path)
+    if isfield(config.path, 'projectRoot') && ~isempty(config.path.projectRoot)
+        pathOverrides.projectRoot = config.path.projectRoot;
+    end
     if isfield(config.path, 'realDataRoot')
         pathOverrides.realDataRoot = config.path.realDataRoot;
     end

@@ -41,6 +41,26 @@ verifyGreaterThan(testCase, result.recoveryInfo.iterations, 0);
 verifyLessThanOrEqual(testCase, result.metrics.observedConsistencyErr, 1e-12);
 end
 
+function testMethodUseFistaOverridesCommon(testCase)
+startup();
+
+[sourceFull, sourceCut] = localBuildRecoveryCase();
+
+cfg1d = localRecoveryConfig('cs_1d');
+cfg1d.common.useFista = false;
+cfg1d.methods.cs_1d.useFista = true;
+result1d = run_recovery(sourceCut, cfg1d, sourceFull);
+verifyEqual(testCase, result1d.status, 'completed');
+verifyTrue(testCase, result1d.recoveryInfo.useFista);
+
+cfg2d = localRecoveryConfig('cs_2d');
+cfg2d.common.useFista = false;
+cfg2d.methods.cs_2d.useFista = true;
+result2d = run_recovery(sourceCut, cfg2d, sourceFull);
+verifyEqual(testCase, result2d.status, 'completed');
+verifyTrue(testCase, result2d.recoveryInfo.useFista);
+end
+
 function [sourceFull, sourceCut] = localBuildRecoveryCase()
 cfg = load_sim_config(struct( ...
     'output', struct('enableSave', false), ...

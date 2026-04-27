@@ -232,6 +232,39 @@ end
 verifyTrue(testCase, didThrow);
 end
 
+function testGeneratePointTargetDataRealInheritUsesProjectRoot(testCase)
+startup();
+
+tempProjectRoot = tempname;
+mkdir(tempProjectRoot);
+realDataDir = fullfile(tempProjectRoot, 'relative_real_data');
+mkdir(realDataDir);
+cleanup = onCleanup(@() rmdir(tempProjectRoot, 's')); %#ok<NASGU>
+localWriteGotchaFixture(realDataDir, 9, 8, 4);
+
+cfg = load_sim_config(struct( ...
+    'path', struct( ...
+        'projectRoot', tempProjectRoot, ...
+        'realDataRoot', 'relative_real_data'), ...
+    'scene', struct( ...
+        'inheritRealTrack', true, ...
+        'targetPositions', [0, 0, 0], ...
+        'targetAmplitudes', 1, ...
+        'targetPhasesDeg', 0, ...
+        'numAzimuthSamples', 32, ...
+        'numRangeSamples', 8), ...
+    'radar', struct( ...
+        'inheritRealRadar', true)));
+
+sourceData = generate_point_target_data(cfg);
+
+verifyTrue(testCase, sourceData.meta.inherit.available);
+verifyEqual(testCase, sourceData.meta.inherit.reason, 'loaded-real-gotcha');
+verifyEqual(testCase, size(sourceData.echo, 1), 8);
+verifyEqual(testCase, numel(sourceData.track.x), 36);
+verifyEqual(testCase, sourceData.radar.numRangeSamples, 8);
+end
+
 function testFullImageReferenceCache(testCase)
 startup();
 
@@ -336,4 +369,18 @@ verifySubstring(testCase, manifestText, '- mode: fixed_gap');
 runInfo.enabled = false;
 skippedPath = save_run_manifest(result, runInfo, cfg);
 verifyEqual(testCase, skippedPath, '');
+end
+
+function localWriteGotchaFixture(dataDir, numFiles, numRangeSamples, numAzimuthPerFile)
+freq = linspace(9.5e9, 9.6e9, numRangeSamples);
+for fileIdx = 1:numFiles
+    data = struct();
+    azOffset = (fileIdx - 1) * numAzimuthPerFile;
+    data.x = azOffset + (1:numAzimuthPerFile);
+    data.y = 10 * ones(1, numAzimuthPerFile);
+    data.z = 100 * ones(1, numAzimuthPerFile);
+    data.fp = complex(ones(numRangeSamples, numAzimuthPerFile) * fileIdx);
+    data.freq = freq;
+    save(fullfile(dataDir, sprintf('data_3dsar_pass1_az%03d_VV.mat', fileIdx)), 'data');
+end
 end

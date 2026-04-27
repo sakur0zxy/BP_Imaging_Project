@@ -18,9 +18,31 @@ config.cache.fullImageNamespace = 'baseline';  % 完整参考图缓存命名空�
 
 %% 3. 场景与目标
 config.scene.referencePoint = [0, 0, 0];       % [m] (1x3) 参考点 [x, y, z]
-config.scene.targetPositions = [0, 0, 0];      % [m] (Nx3) 目标坐标
-config.scene.targetAmplitudes = 1;             % [linear] (Nx1) 目标幅度
-config.scene.targetPhasesDeg = 0;              % [deg] (Nx1) 目标初始相位
+% 原始默认目标：单点目标
+% config.scene.targetPositions = [0, 0, 0];      % [m] (Nx3) 目标坐标
+% config.scene.targetAmplitudes = 1;             % [linear] (Nx1) 目标幅度
+% config.scene.targetPhasesDeg = 0;              % [deg] (Nx1) 目标初始相位
+
+% 小汽车形状点目标：车身、车顶、车轮
+config.scene.targetPositions = [
+    -4.0, -1.5, 0;  % 后左角
+    -4.0,  1.5, 0;  % 后右角
+     4.0, -1.5, 0;  % 前左角
+     4.0,  1.5, 0;  % 前右角
+    -1.5,  0.9, 0;  % 左侧车顶
+     1.5,  0.9, 0;  % 右侧车顶
+    -1.5, -0.9, 0;  % 左侧底部
+     1.5, -0.9, 0;  % 右侧底部
+    -3.5, -1.7, 0;  % 左后轮
+    -3.5,  1.7, 0;  % 右后轮
+     3.5, -1.7, 0;  % 左前轮
+     3.5,  1.7, 0;  % 右前轮
+];
+config.scene.targetAmplitudes = [
+    1.0; 1.0; 1.0; 1.0; ...   % 车身角点
+    0.9; 0.9; 0.9; 0.9; ...   % 车顶与车底
+    0.7; 0.7; 0.7; 0.7];      % 车轮
+config.scene.targetPhasesDeg = zeros(12, 1);  % [deg] 目标初始相位
 
 % 若为 true，仿真直接继承实测轨迹。
 % 此时下面的 scene.trackXLimits 和 scene.track.* 只作为默认占位，不参与实际轨迹生成。
@@ -119,7 +141,7 @@ config.analysis.imageQuality = struct( ...
     'compareMode', 'amplitude');               % 'amplitude' | 'complex'
 
 config.analysis.recoveryEvaluation = struct( ...
-    'enable', false, ...                      % [bool] 默认关闭恢复效果评估；需要评估时再手动开启
+    'enable', true, ...                       % [bool] 默认关闭恢复效果评估；需要评估时再手动开启
     'evaluationMode', 'auto', ...              % 'auto' 默认跟随 real/sim 流程；也可手动写 'real' | 'simulation'
     'caseNames', {{'full', 'interrupted', 'recovered_cs_1d', 'recovered_cs_2d'}}, ...
     'referenceCase', 'full', ...               % 对比参考 case
@@ -146,9 +168,9 @@ config.debug.showPointTargetFigures = true;   % [bool] 是否弹出点目标分�
 config.output.enableSave = false;              % [bool] 是否保存结果
 config.output.runRoot = fullfile('results', 'sim_runs'); % 结果根目录
 config.output.saveImagePng = false;            % [bool] 是否保存可视化 PNG
-config.output.saveImageMat = true;             % [bool] 是否保存图像矩阵 MAT
-config.output.saveSummaryMat = true;           % [bool] 是否保存 summary.mat
-config.output.saveAnalysisMat = true;          % [bool] 是否保存 analysis.mat
+config.output.saveImageMat = false;            % [bool] 是否保存图像矩阵 MAT
+config.output.saveSummaryMat = false;          % [bool] 是否保存 summary.mat
+config.output.saveAnalysisMat = false;         % [bool] 是否保存 analysis.mat
 config.output.imageScaleMode = 'log';          % 'log' | 'linear'
 config.output.imageDynamicRangeDb = 40;        % [dB] 图像显示动态范围
 

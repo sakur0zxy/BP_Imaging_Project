@@ -41,6 +41,10 @@ methodConfig = get_method_config(recoveryConfig, methodName);
 assert(isfield(methodConfig, 'lambda') && isnumeric(methodConfig.lambda) ...
     && isscalar(methodConfig.lambda) && methodConfig.lambda >= 0, ...
     'recovery.methods.%s.lambda 必须大于等于 0。', methodName);
+if isfield(methodConfig, 'useFista')
+    assert(islogical(methodConfig.useFista) && isscalar(methodConfig.useFista), ...
+        'recovery.methods.%s.useFista 必须是逻辑标量。', methodName);
+end
 
 recoveryConfig.method = methodName;
 recoveryConfig.common = commonConfig;

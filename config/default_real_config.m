@@ -47,9 +47,9 @@ config.imaging.outputScale = 7;                % 保留参数
 
 %% 6. 缺失控制
 % mode 仅支持：'none' | 'fixed_gap' | 'random_gap'
-config.degradation.enable = false;             % [bool] 实测默认不做缺失控制
-config.degradation.mode = 'none';              % 缺失模式；默认保留完整实测回波
-config.degradation.missingRatio = 0;           % [ratio] 默认缺失比例
+config.degradation.enable = true;             % [bool] 实测默认不做缺失控制
+config.degradation.mode = 'fixed_gap';              % 缺失模式；默认保留完整实测回波
+config.degradation.missingRatio = 0.2;           % [ratio] 默认缺失比例
 config.degradation.numSegments = 5;            % [count] 缺失分段数
 config.degradation.gapMinMeters = 0;           % [m] 随机缺失最小物理长度
 config.degradation.gapMaxMeters = 100;         % [m] 随机缺失最大物理长度
@@ -58,7 +58,7 @@ config.degradation.randomSeed = [];            % [int] 随机种子
 
 %% 7. 恢复
 % recovery.method 正式支持：'cs_1d' | 'cs_2d'
-config.recovery.enable = false;               % [bool] 实测默认关闭恢复；有缺失实验时再手动开启
+config.recovery.enable = true;               % [bool] 实测默认关闭恢复；有缺失实验时再手动开启
 config.recovery.method = 'cs_1d';              % 恢复方法名
 config.recovery.common = struct( ...
     'maxIter', 80, ...                         % [count] 最大迭代次数
@@ -89,7 +89,7 @@ config.analysis.imageQuality = struct( ...
     'compareMode', 'amplitude');               % 'amplitude' | 'complex'
 
 config.analysis.recoveryEvaluation = struct( ...
-    'enable', false, ...                      % [bool] 实测默认关闭恢复评估；做恢复实验时再手动开启
+    'enable', true, ...                      % [bool] 实测默认关闭恢复评估；做恢复实验时再手动开启
     'evaluationMode', 'auto', ...              % 'auto' 默认跟随 real/sim 流程；也可手动写 'real' | 'simulation'
     'caseNames', {{'full', 'interrupted', 'recovered_cs_1d', 'recovered_cs_2d'}}, ...
     'referenceCase', 'full', ...               % 对比参考 case
@@ -116,9 +116,9 @@ config.debug.showPointTargetFigures = true;   % [bool] 是否弹出点目标分�
 config.output.enableSave = false;              % [bool] 是否保存结果
 config.output.runRoot = fullfile('results', 'real_runs'); % 结果根目录
 config.output.saveImagePng = false;            % [bool] 是否保存可视化 PNG
-config.output.saveImageMat = true;             % [bool] 是否保存图像矩阵 MAT
-config.output.saveSummaryMat = true;           % [bool] 是否保存 summary.mat
-config.output.saveAnalysisMat = true;          % [bool] 是否保存 analysis.mat
+config.output.saveImageMat = false;            % [bool] 是否保存图像矩阵 MAT
+config.output.saveSummaryMat = false;          % [bool] 是否保存 summary.mat
+config.output.saveAnalysisMat = false;         % [bool] 是否保存 analysis.mat
 config.output.imageScaleMode = 'linear';       % 'log' | 'linear'
 config.output.imageDynamicRangeDb = 40;        % [dB] 图像显示动态范围
 

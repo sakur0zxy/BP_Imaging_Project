@@ -57,6 +57,7 @@ info.method = methodName;
 info.iterations = numel(relHistory);
 info.converged = relHistory(end) <= solverConfig.tol;
 info.lambda = solverConfig.lambda;
+info.useFista = solverConfig.useFista;
 info.relChangeHistory = relHistory;
 info.objectiveHistory = objHistory;
 info.scaleValue = scaleValue;
