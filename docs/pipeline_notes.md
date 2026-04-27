@@ -74,7 +74,13 @@
 - `summary.*`
 - 可选 `recovery_evaluation.mat`
 - 可选 `recovery_evaluation_summary.txt`
-- 可选 `recovery_evaluation_panel.png`
+- 可选 `recovery_evaluation_panel.png`：完整图总览 + 每个 case 的点目标指标摘要
+- 可选 `recovery_evaluation_point_target_panel.png`：点目标局部图 + X/Y 剖面叠加对比
+
+两类恢复评估图的职责不同：
+
+- `recovery_evaluation_panel.png` 用来看整体成像结果是否合理，以及每个 case 的核心指标状态。
+- `recovery_evaluation_point_target_panel.png` 用来看点目标主瓣、旁瓣、拖尾和剖面恢复变化。
 
 ## Pipeline Provenance
 

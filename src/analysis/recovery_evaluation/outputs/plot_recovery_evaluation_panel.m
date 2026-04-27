@@ -28,20 +28,7 @@ for idx = 1:numel(caseNames)
     title(strrep(caseResult.displayName, '_', '\_'));
 
     nexttile(idx + numel(caseNames));
-    if localHasPointProfile(caseResult)
-        plot(caseResult.artifacts.analysisResult.pointTarget.xProfile.profileDb, 'LineWidth', 1.0);
-        grid on;
-        xlabel('Sample');
-        ylabel('dB');
-        title(sprintf('PSLR %.2f | ISLR %.2f', ...
-            caseResult.artifacts.analysisResult.pointTarget.xProfile.metrics.pslrDb, ...
-            caseResult.artifacts.analysisResult.pointTarget.xProfile.metrics.islrDb));
-    else
-        axis off;
-        text(0.05, 0.75, sprintf('status: %s', caseResult.status), 'Interpreter', 'none');
-        text(0.05, 0.50, sprintf('peak: %.4g', caseResult.metrics.peak.value), 'Interpreter', 'none');
-        text(0.05, 0.25, sprintf('recovery: %s', caseResult.metrics.recovery.status), 'Interpreter', 'none');
-    end
+    localDrawMetricCard(caseResult);
 end
 
 if ~isempty(panelFile)
@@ -62,12 +49,54 @@ imageDb = max(imageDb, -40);
 previewImage = (imageDb + 40) / 40;
 end
 
-function tf = localHasPointProfile(caseResult)
-tf = isfield(caseResult, 'artifacts') && isstruct(caseResult.artifacts) ...
-    && isfield(caseResult.artifacts, 'analysisResult') ...
-    && isstruct(caseResult.artifacts.analysisResult) ...
-    && isfield(caseResult.artifacts.analysisResult, 'pointTarget') ...
-    && strcmp(localGetField(caseResult.artifacts.analysisResult.pointTarget, 'status', ''), 'completed');
+function localDrawMetricCard(caseResult)
+axis off;
+metricLines = localBuildMetricLines(caseResult);
+text(0.03, 0.95, strjoin(metricLines, newline), ...
+    'Units', 'normalized', ...
+    'VerticalAlignment', 'top', ...
+    'Interpreter', 'none', ...
+    'FontName', 'Consolas', ...
+    'FontSize', 8);
+end
+
+function metricLines = localBuildMetricLines(caseResult)
+metricLines = { ...
+    sprintf('status: %s', localGetField(caseResult, 'status', '')); ...
+    sprintf('recovery: %s', localGetNestedField(caseResult, {'metrics', 'recovery', 'status'}, ''))};
+
+peakValue = localGetNestedField(caseResult, {'metrics', 'peak', 'value'}, NaN);
+metricLines{end + 1} = sprintf('peak: %s', localFormatNumber(peakValue, '%.4g'));
+
+pointMetrics = localGetNestedField(caseResult, {'metrics', 'pointTarget'}, struct('available', false));
+if isstruct(pointMetrics) && localGetField(pointMetrics, 'available', false)
+    metricLines{end + 1} = sprintf('PSLR: %s dB', ...
+        localFormatNumber(localGetField(pointMetrics, 'avgPslrDb', NaN), '%.2f'));
+    metricLines{end + 1} = sprintf('ISLR: %s dB', ...
+        localFormatNumber(localGetField(pointMetrics, 'avgIslrDb', NaN), '%.2f'));
+    metricLines{end + 1} = sprintf('IRW: %s m', ...
+        localFormatNumber(localGetField(pointMetrics, 'avgIrwPhysical', NaN), '%.4g'));
+else
+    pointStatus = localGetNestedField(caseResult, ...
+        {'artifacts', 'analysisResult', 'pointTarget', 'status'}, 'missing');
+    metricLines{end + 1} = sprintf('pointTarget: %s', pointStatus);
+end
+end
+
+function textValue = localFormatNumber(value, formatText)
+if isnumeric(value) && isscalar(value) && isfinite(value)
+    textValue = sprintf(formatText, value);
+elseif isnumeric(value) && isscalar(value) && isinf(value)
+    if value > 0
+        textValue = 'Inf';
+    else
+        textValue = '-Inf';
+    end
+elseif isnumeric(value) && isscalar(value) && isnan(value)
+    textValue = 'NaN';
+else
+    textValue = '';
+end
 end
 
 function value = localGetField(data, fieldName, defaultValue)
@@ -75,6 +104,19 @@ value = defaultValue;
 if isstruct(data) && isfield(data, fieldName)
     value = data.(fieldName);
 end
+end
+
+function value = localGetNestedField(data, fieldPath, defaultValue)
+value = defaultValue;
+current = data;
+for idx = 1:numel(fieldPath)
+    fieldName = fieldPath{idx};
+    if ~isstruct(current) || ~isfield(current, fieldName)
+        return;
+    end
+    current = current.(fieldName);
+end
+value = current;
 end
 
 function localCloseFigure(figureHandle, showPanel)

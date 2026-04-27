@@ -1,6 +1,12 @@
 function files = emit_recovery_evaluation_outputs(recoveryEvaluation, runInfo, ~, evalConfig)
 %EMIT_RECOVERY_EVALUATION_OUTPUTS 统一处理保存与显示开关。
-files = struct('matFile', '', 'summaryFile', '', 'panelFile', '', 'panelShown', false);
+files = struct( ...
+    'matFile', '', ...
+    'summaryFile', '', ...
+    'panelFile', '', ...
+    'panelShown', false, ...
+    'pointTargetPanelFile', '', ...
+    'pointTargetPanelShown', false);
 outputOptions = evalConfig.outputOptions;
 
 if isfield(outputOptions, 'enable') && ~outputOptions.enable
@@ -19,6 +25,8 @@ end
 
 shouldSavePanel = outputOptions.savePanel && runInfo.enabled;
 shouldShowPanel = outputOptions.showPanel;
+shouldSavePointTargetPanel = outputOptions.savePointTargetPanel && runInfo.enabled;
+shouldShowPointTargetPanel = outputOptions.showPointTargetPanel;
 
 if shouldSavePanel
     files.panelFile = fullfile(runInfo.imagesDir, 'recovery_evaluation_panel.png');
@@ -28,6 +36,16 @@ if shouldSavePanel || shouldShowPanel
     files.panelFile = plot_recovery_evaluation_panel( ...
         recoveryEvaluation, files.panelFile, shouldShowPanel);
     files.panelShown = shouldShowPanel;
+end
+
+if shouldSavePointTargetPanel
+    files.pointTargetPanelFile = fullfile(runInfo.imagesDir, 'recovery_evaluation_point_target_panel.png');
+end
+
+if shouldSavePointTargetPanel || shouldShowPointTargetPanel
+    files.pointTargetPanelFile = plot_recovery_evaluation_point_target_panel( ...
+        recoveryEvaluation, files.pointTargetPanelFile, shouldShowPointTargetPanel);
+    files.pointTargetPanelShown = shouldShowPointTargetPanel;
 end
 end
 

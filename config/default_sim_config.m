@@ -128,7 +128,9 @@ config.analysis.recoveryEvaluation = struct( ...
         'saveMat', false, ...                  % [bool] 是否保存结构化评估结果
         'saveSummary', false, ...              % [bool] 是否保存简短 summary 文本
         'savePanel', false, ...                % [bool] 是否保存总览对比图文件
-        'showPanel', true), ...                % [bool] 是否直接显示总览对比图
+        'showPanel', true, ...                 % [bool] 是否直接显示总览对比图
+        'savePointTargetPanel', false, ...     % [bool] 是否保存点目标细节对比图
+        'showPointTargetPanel', true), ...     % [bool] 是否直接显示点目标细节对比图
     'metricOptions', struct( ...
         'enablePointAnalysis', true, ...      % [bool] 评估内部是否强制做点目标分析
         'enableImageQuality', true, ...        % [bool] 评估内部是否强制做图像质量评估

@@ -80,9 +80,13 @@
 - `analysis.recoveryEvaluation.outputs.saveSummary`
   是否保存文本摘要。
 - `analysis.recoveryEvaluation.outputs.savePanel`
-  是否保存 `recovery_evaluation_panel.png` 总览图。
+  是否保存 `recovery_evaluation_panel.png` 总览图。该图第一行是完整成像图，第二行是每个 case 的指标摘要。
 - `analysis.recoveryEvaluation.outputs.showPanel`
   是否直接弹出总览图。
+- `analysis.recoveryEvaluation.outputs.savePointTargetPanel`
+  是否保存 `recovery_evaluation_point_target_panel.png` 点目标细节对比图。
+- `analysis.recoveryEvaluation.outputs.showPointTargetPanel`
+  是否直接弹出点目标细节对比图。该图显示点目标局部图和 X/Y 剖面叠加曲线。
 - `analysis.recoveryEvaluation.metricOptions.enablePointAnalysis`
   recovery evaluation 内部是否对 case 执行点目标分析。
 - `analysis.recoveryEvaluation.metricOptions.enableImageQuality`
